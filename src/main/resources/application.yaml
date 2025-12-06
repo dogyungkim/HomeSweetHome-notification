@@ -1,0 +1,62 @@
+spring:
+  application:
+    name: homesweet-notification
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: ${DATABASE_URL:jdbc:mysql://localhost:3306/homesweet}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${DATABASE_USERNAME:homesweet}
+    password: ${DATABASE_PASSWORD:homesweet}
+    hikari:
+      maximum-pool-size: ${DATABASE_MAXIMUM_POOL_SIZE:10}
+      minimum-idle: ${DATABASE_MINIMUM_IDLE:5}
+      idle-timeout: ${DATABASE_IDLE_TIMEOUT:60000}
+      max-lifetime: ${DATABASE_MAX_LIFETIME:1800000}
+      connection-timeout: ${DATABASE_CONNECTION_TIMEOUT:30000}
+      validation-timeout: ${DATABASE_VALIDATION_TIMEOUT:5000}
+      validation-interval: ${DATABASE_VALIDATION_INTERVAL:30000}
+      validation-query: SELECT 1
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: false
+        default_batch_fetch_size: 30
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+      timeout: ${REDIS_TIMEOUT:2000ms}
+  threads:
+    virtual:
+      enabled: true
+
+jwt:
+  secret: ${JWT_SECRET}  # 필수 환경 변수
+  access-token-expiration: 1800000   # 30분 (프로덕션에서는 짧게)
+  refresh-token-expiration: 604800000 # 7일
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    tags:
+      application: homesweet-back
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+notification:
+  batchSize: ${NOTIFICATION_BATCH_SIZE:250}

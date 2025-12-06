@@ -1,0 +1,115 @@
+package com.homesweet.notification.config;
+
+import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
+
+import java.util.concurrent.Executor;
+
+/**
+ * 비동기 처리 설정
+ * 
+ * 알림 서비스의 비동기 처리를 위한 스레드 풀 설정
+ * 
+ * @author dogyungkim
+ */
+@Slf4j
+@Configuration
+@EnableAsync
+@Profile("!test")
+public class AsyncConfig {
+
+    /**
+     * 알림 전송 전용 스레드 풀 (Virtual Threads)
+     */
+    @Bean(name = "notificationTaskExecutor")
+    public Executor notificationTaskExecutor() {
+        SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor("notification-vt-");
+        executor.setVirtualThreads(true);
+        return executor;
+    }
+
+    /**
+     * SSE 전송 전용 스레드 풀 (Virtual Threads)
+     *
+     */
+    @Bean(name = "sseTaskExecutor")
+    public Executor sseTaskExecutor() {
+        SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor("sse-vt-");
+        executor.setVirtualThreads(true);
+        return executor;
+    }
+
+    // 최근 검색어 비동기 처리 설정
+    @Bean(name = "recentSearchTaskExecutor")
+    public Executor recentSearchTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(50);
+        executor.setThreadNamePrefix("recent-search-async-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+        executor.setRejectedExecutionHandler((r, executor1) -> {
+            log.warn("최근 검색어 저장 작업이 거부되었습니다. 큐가 가득 찼습니다.");
+        });
+        executor.initialize();
+        return executor;
+    }
+
+    // 상품 검색 이벤트 발행 비동기 처리
+    @Bean(name = "productEventExecutor")
+    public Executor productEventExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("product-event-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        executor.setRejectedExecutionHandler((r, executor1) -> {
+            log.warn("상품 이벤트 비동기 처리에 실패하였습니다.");
+        });
+        executor.initialize();
+        return executor;
+    }
+
+    // 게시글 검색 이벤트 발행 비동기 처리
+    @Bean(name = "communityEventExecutor")
+    public Executor communityEventExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("community-event-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        executor.setRejectedExecutionHandler((r, executor1) -> {
+            log.warn("게시글 엘라스틱 이벤트 비동기 처리에 실패하였습니다.");
+        });
+        executor.initialize();
+        return executor;
+    }
+
+    // 채팅방 검색 이벤트 발행 비동기 처리
+    @Bean(name = "chatroomEventExecutor")
+    public Executor chatroomEventExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("chatroom-event-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        executor.setRejectedExecutionHandler((r, executor1) -> {
+            log.warn("채팅방 엘라스틱 이벤트 비동기 처리에 실패하였습니다.");
+        });
+        executor.initialize();
+        return executor;
+    }
+}
