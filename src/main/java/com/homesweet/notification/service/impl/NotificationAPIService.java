@@ -61,7 +61,8 @@ public class NotificationAPIService {
      */
     @Transactional
     public void markAsRead(Long userId, List<Long> notificationIds) {
-        List<UserNotification> userNotifications = userNotificationRepository.findByIdInAndUserIdAndNotDeleted(notificationIds, userId);
+        List<UserNotification> userNotifications = userNotificationRepository
+                .findByIdInAndUserIdAndNotDeleted(notificationIds, userId);
 
         if (userNotifications.isEmpty()) {
             throw new NotificationException(ErrorCode.NOTIFICATION_NOT_FOUND);
@@ -81,7 +82,8 @@ public class NotificationAPIService {
      */
     @Transactional
     public void markAsDeleted(Long userId, List<Long> notificationIds) {
-        List<UserNotification> userNotifications = userNotificationRepository.findByIdInAndUserIdAndNotDeleted(notificationIds, userId);
+        List<UserNotification> userNotifications = userNotificationRepository
+                .findByIdInAndUserIdAndNotDeleted(notificationIds, userId);
 
         if (userNotifications.isEmpty()) {
             throw new NotificationException(ErrorCode.NOTIFICATION_NOT_FOUND);

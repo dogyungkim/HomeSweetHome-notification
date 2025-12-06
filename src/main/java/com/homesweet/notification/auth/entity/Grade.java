@@ -1,4 +1,4 @@
-package com.homesweet.notification.grade.entity;
+package com.homesweet.notification.auth.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

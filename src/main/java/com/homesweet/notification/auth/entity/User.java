@@ -1,7 +1,5 @@
 package com.homesweet.notification.auth.entity;
 
-import com.homesweet.notification.grade.entity.Grade;
-
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;

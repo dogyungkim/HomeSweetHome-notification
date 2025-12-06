@@ -1,8 +1,5 @@
 package com.homesweet.notification.exception;
 
-import com.homesweet.notification.exception.BusinessException;
-import com.homesweet.notification.exception.ErrorCode;
-
 /**
  * 알림 관련 비즈니스 예외
  *
