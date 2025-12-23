@@ -36,6 +36,26 @@ spring:
   threads:
     virtual:
       enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      group-id: notification
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.value.default.type: com.homesweet.notification.domain.event.TemplateNotificationEvent
+        spring.json.trusted.packages: "*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    listener:
+      ack-mode: BATCH  # 배치를 다 처리하면 커밋 (성능과 안정성의 균형)
+      concurrency: 3   # 컨슈머 스레드 3개 가동 (알림 발송은 I/O 작업이므로 병렬 처리가 중요)
+      type: SINGLE     # 메시지 하나씩 로직 수행 (로직 작성이 편함)
+logging:
+  level:
+    com.homesweet.notification: ERROR
 
 jwt:
   secret: ${JWT_SECRET}  # 필수 환경 변수

@@ -15,9 +15,9 @@ import com.homesweet.notification.service.NotificationPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -35,20 +35,35 @@ import java.util.Map;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class NotificationEventListener {
+public class NotificationProcessor {
 
   private final UserNotificationService userNotificationService;
   private final NotificationPublisher notificationPublisher;
   private final UserService userService;
+
+  private static final int BATCH_SIZE = 500;
 
   /**
    * 템플릿 알림 이벤트 처리
    * 
    * 단일 사용자 또는 다수 사용자 모두 처리합니다.
    * TemplateNotification을 통해 DB에서 템플릿을 조회하고, Payload와 함께 알림을 전송합니다.
+   * 
+   * Kafka에서 호출될 때는 동기적으로 처리되어 commit 보장을 위해 @Async가 없습니다.
+   * 다른 곳에서 이벤트로 호출될 때는 비동기 처리를 위해 @EventListener와 함께 사용됩니다.
    */
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+  @EventListener
+  @Async("notificationTaskExecutor")
   public void handleTemplateNotificationEvent(TemplateNotificationEvent event) {
+    processTemplateNotification(event);
+  }
+
+  /**
+   * 템플릿 알림 처리 로직 (동기 처리용)
+   * 
+   * Kafka Listener에서 직접 호출하여 동기적으로 처리합니다.
+   */
+  public void processTemplateNotification(TemplateNotificationEvent event) {
     log.info("템플릿 알림 이벤트 처리 시작: userIds={}, eventType={}", event.userIds(),
         event.notification().getEventType());
 
@@ -60,57 +75,139 @@ public class NotificationEventListener {
 
     log.info("템플릿 조회 완료: template={}", template);
 
-    // 3. 템플릿을 사용하여 사용자화 된 알림 생성
-    List<UserNotification> userNotifications = createUserNotification(event.userIds(), notification, template);
+    List<Long> userIds = event.userIds();
 
-    // 4. 사용자화 된 알림을 DB에 저장(bulk + last_insert_id 활용 해서 id 계산)
-    userNotificationService.bulkInsertUserNotifications(userNotifications);
+    // 단일 사용자 처리 최적화
+    if (userIds.size() == 1) {
+      processSingleNotification(userIds, notification, template);
+      return;
+    }
 
-    // 5. 사용자화 된 알림을 DTO로 변환
-    Map<Long, PushNotificationDTO> pushNotificationDTOMap = convertToPushNotificationDTO(template, userNotifications);
-
-    // 6. SSE 전송 (Redis Pub/Sub)
-    pushNotificationDTOMap.forEach(notificationPublisher::publish);
+    // 다수 사용자 배치 처리
+    processBatchNotifications(userIds, notification, template);
   }
 
   /**
    * 커스텀 알림 이벤트 처리
+   * 
+   * Kafka에서 호출될 때는 동기적으로 처리되어 commit 보장을 위해 @Async가 없습니다.
+   * 다른 곳에서 이벤트로 호출될 때는 비동기 처리를 위해 @EventListener와 함께 사용됩니다.
    */
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+  @EventListener
+  @Async("notificationTaskExecutor")
   public void handleCustomNotificationEvent(CustomNotificationEvent event) {
+    processCustomNotification(event);
+  }
+
+  /**
+   * 커스텀 알림 처리 로직 (동기 처리용)
+   * 
+   * Kafka Listener에서 직접 호출하여 동기적으로 처리합니다.
+   */
+  public void processCustomNotification(CustomNotificationEvent event) {
     log.info("커스텀 알림 이벤트 처리 시작: userIds={}, categoryType={}, title={}", event.userIds(),
         event.notification().getTitle(), event.notification().getContent());
 
     // 1. 이벤트에서 알림 정보 추출
     CustomNotification notification = event.notification();
 
+    // TODO: 커스텀 알림은 따로 템플릿 저장하지 않기
     // 2. 커스텀 알림 템플릿 생성
     NotificationTemplate template = userNotificationService.createAndSaveCustomNotificationTemplate(
         notification.getTitle(),
         notification.getContent(),
         notification.getRedirectUrl());
 
-    // 3. 알림 생성
-    List<UserNotification> userNotifications = createUserNotification(event.userIds(), notification,
-        template);
+    List<Long> userIds = event.userIds();
 
-    // 4. 사용자화 된 알림을 DB에 저장(bulk + last_insert_id 활용 해서 id 계산)
-    userNotificationService.bulkInsertUserNotifications(userNotifications);
+    // 단일 사용자 처리 최적화
+    if (userIds.size() == 1) {
+      processSingleNotification(userIds, notification, template);
+      return;
+    }
 
-    // 5. 사용자화 된 알림을 DTO로 변환
-    Map<Long, PushNotificationDTO> pushNotificationDTOMap = convertToPushNotificationDTO(template,
-        userNotifications);
-
-    // 6. SSE 전송 (Redis Pub/Sub)
-    pushNotificationDTOMap.forEach(notificationPublisher::publish);
+    // 다수 사용자 배치 처리
+    processBatchNotifications(userIds, notification, template);
   }
 
   // 내부 메서드
+
+  private void processSingleNotification(List<Long> userIds, TemplateNotification notification,
+      NotificationTemplate template) {
+    // 3. 템플릿을 사용하여 사용자화 된 알림 생성
+    UserNotification userNotification = createSingleUserNotification(userIds.get(0), notification, template);
+
+    // 4. 단건 저장
+    if (userNotification != null) {
+      userNotificationService.saveUserNotification(userNotification);
+
+      // 5. DTO 변환
+      // convertToPushNotificationDTO expects a list, so we wrap the single item
+      List<UserNotification> userNotifications = List.of(userNotification);
+      Map<Long, PushNotificationDTO> pushNotificationDTOMap = convertToPushNotificationDTO(template, userNotifications);
+      // 6. 푸시 알림 전송
+      notificationPublisher.publishBulk(pushNotificationDTOMap);
+    }
+  }
+
+  private void processBatchNotifications(List<Long> userIds, TemplateNotification notification,
+      NotificationTemplate template) {
+    int totalUsers = userIds.size();
+    for (int i = 0; i < totalUsers; i += BATCH_SIZE) {
+      int end = Math.min(i + BATCH_SIZE, totalUsers);
+      List<Long> batchUserIds = userIds.subList(i, end);
+
+      try {
+        // 3. 배치 단위 알림 생성
+        List<UserNotification> batchUserNotifications = createBatchUserNotifications(batchUserIds, notification,
+            template);
+
+        if (batchUserNotifications.isEmpty()) {
+          continue;
+        }
+
+        // 4. 배치 저장
+        userNotificationService.bulkInsertUserNotifications(batchUserNotifications);
+
+        // 5. 배치 DTO 변환 및 전송
+        Map<Long, PushNotificationDTO> pushNotificationDTOMap = convertToPushNotificationDTO(template,
+            batchUserNotifications);
+        notificationPublisher.publishBulk(pushNotificationDTOMap);
+
+      } catch (Exception e) {
+        log.error("배치 처리 중 오류 발생: range={}-{}, error={}", i, end, e.getMessage(), e);
+        // 배치 처리 중 오류가 발생하더라도 다음 배치는 계속 처리해야 함
+      }
+    }
+  }
+
   /**
    * 알림 정보를 활용해 사용자 알림 생성
    */
+  /**
+   * 알림 정보를 활용해 단일 사용자 알림 생성
+   */
+  private UserNotification createSingleUserNotification(
+      Long userId,
+      TemplateNotification notification,
+      NotificationTemplate template) {
+    try {
+      User user = userService.getUserById(userId);
+      Map<String, Object> notificationContextData = notification.toMap();
+      return userNotificationService.createUserNotification(
+          user,
+          template,
+          notificationContextData);
+    } catch (Exception e) {
+      log.error("사용자 알림 객체 생성 실패: userId={}, error={}", userId, e.getMessage(), e);
+      return null;
+    }
+  }
 
-  private List<UserNotification> createUserNotification(
+  /**
+   * 알림 정보를 활용해 다수 사용자 알림 생성 (배치)
+   */
+  private List<UserNotification> createBatchUserNotifications(
       List<Long> userIds,
       TemplateNotification notification,
       NotificationTemplate template) {
@@ -137,7 +234,6 @@ public class NotificationEventListener {
   /**
    * 알림 객체를 푸시 알림 DTO로 변환
    */
-
   private Map<Long, PushNotificationDTO> convertToPushNotificationDTO(
       NotificationTemplate template,
       List<UserNotification> userNotifications) {

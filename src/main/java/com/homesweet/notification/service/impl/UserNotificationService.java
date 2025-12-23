@@ -18,6 +18,7 @@ import com.homesweet.notification.exception.NotificationException;
 import com.homesweet.notification.repository.NotificationCategoryRepository;
 import com.homesweet.notification.repository.NotificationTemplateRepository;
 import com.homesweet.notification.repository.UserNotificationJdbcRepository;
+import com.homesweet.notification.repository.UserNotificationRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,7 @@ public class UserNotificationService {
     private final NotificationCategoryRepository notificationCategoryRepository;
     private final NotificationTemplateRepository notificationTemplateRepository;
     private final UserNotificationJdbcRepository userNotificationJdbcRepository;
+    private final UserNotificationRepository userNotificationRepository;
 
     /**
      * 사용자 알림을 대량으로 저장합니다.
@@ -55,6 +57,20 @@ public class UserNotificationService {
         }
 
         userNotificationJdbcRepository.saveAll(userNotifications);
+    }
+
+    /**
+     * 사용자 알림을 단건 저장합니다.
+     *
+     * @param userNotification 사용자 알림
+     * @throws IllegalArgumentException 알림이 null인 경우
+     */
+    @Transactional
+    public void saveUserNotification(UserNotification userNotification) {
+        if (userNotification == null) {
+            throw new IllegalArgumentException("사용자 알림은 null일 수 없습니다.");
+        }
+        userNotificationRepository.save(userNotification);
     }
 
     /**

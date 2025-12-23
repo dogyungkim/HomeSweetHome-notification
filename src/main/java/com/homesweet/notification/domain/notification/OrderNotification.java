@@ -5,7 +5,7 @@ import com.homesweet.notification.domain.NotificationTemplateType;
 
 import lombok.Builder;
 import lombok.Getter;
-
+import lombok.extern.jackson.Jacksonized;
 
 /**
  * 주문 관련 알림 클래스
@@ -15,7 +15,7 @@ import lombok.Getter;
  * @author dogyungkim
  */
 public class OrderNotification {
-    
+
     /**
      * 주문 완료 알림
      * 
@@ -27,9 +27,10 @@ public class OrderNotification {
     public static class OrderCompleted implements TemplateNotification {
         private final String userName;
         private final Long orderId;
-        
+
         private final NotificationTemplateType eventType = NotificationTemplateType.ORDER_COMPLETED;
-        
+
+        @Jacksonized
         @Builder
         public OrderCompleted(String userName, Long orderId) {
             if (userName == null || userName.isBlank()) {
@@ -41,13 +42,13 @@ public class OrderNotification {
             this.userName = userName;
             this.orderId = orderId;
         }
-        
+
         @Override
         public NotificationTemplateType getEventType() {
             return eventType;
         }
     }
-    
+
     /**
      * 주문 취소 알림
      * 
@@ -59,10 +60,11 @@ public class OrderNotification {
     public static class OrderCancelled implements TemplateNotification {
         private final String userName;
         private final Long orderId;
-        
+
         @JsonIgnore
         private final NotificationTemplateType eventType = NotificationTemplateType.ORDER_CANCELLED;
-        
+
+        @Jacksonized
         @Builder
         public OrderCancelled(String userName, Long orderId) {
             if (userName == null || userName.isBlank()) {
@@ -74,13 +76,13 @@ public class OrderNotification {
             this.userName = userName;
             this.orderId = orderId;
         }
-        
+
         @Override
         public NotificationTemplateType getEventType() {
             return eventType;
         }
     }
-    
+
     /**
      * 배송 시작 알림
      * 
@@ -92,10 +94,11 @@ public class OrderNotification {
     public static class OrderShipped implements TemplateNotification {
         private final String userName;
         private final Long orderId;
-        
+
         @JsonIgnore
         private final NotificationTemplateType eventType = NotificationTemplateType.ORDER_SHIPPED;
-        
+
+        @Jacksonized
         @Builder
         public OrderShipped(String userName, Long orderId) {
             if (userName == null || userName.isBlank()) {
@@ -107,13 +110,13 @@ public class OrderNotification {
             this.userName = userName;
             this.orderId = orderId;
         }
-        
+
         @Override
         public NotificationTemplateType getEventType() {
             return eventType;
         }
     }
-    
+
     /**
      * 배송 완료 알림
      * 
@@ -125,10 +128,11 @@ public class OrderNotification {
     public static class OrderDelivered implements TemplateNotification {
         private final String userName;
         private final Long orderId;
-        
+
         @JsonIgnore
         private final NotificationTemplateType eventType = NotificationTemplateType.ORDER_DELIVERED;
-        
+
+        @Jacksonized
         @Builder
         public OrderDelivered(String userName, Long orderId) {
             if (userName == null || userName.isBlank()) {
@@ -140,11 +144,10 @@ public class OrderNotification {
             this.userName = userName;
             this.orderId = orderId;
         }
-        
+
         @Override
         public NotificationTemplateType getEventType() {
             return eventType;
         }
     }
 }
-

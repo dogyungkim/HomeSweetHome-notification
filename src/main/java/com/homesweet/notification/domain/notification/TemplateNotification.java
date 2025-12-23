@@ -1,5 +1,7 @@
 package com.homesweet.notification.domain.notification;
 
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.homesweet.notification.domain.NotificationTemplateType;
 
@@ -12,6 +14,18 @@ import java.util.Map;
  * 
  * @author dogyungkim
  */
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.EXISTING_PROPERTY, property = "eventType", visible = true)
+@JsonSubTypes({
+        // System
+        @JsonSubTypes.Type(value = SystemNotification.SystemMaintenance.class, name = "SYSTEM_MAINTENANCE"),
+        @JsonSubTypes.Type(value = SystemNotification.SystemUpdate.class, name = "SYSTEM_UPDATE"),
+        @JsonSubTypes.Type(value = SystemNotification.SellerRegistrationComplete.class, name = "SELLER_REGISTRATION_COMPLETE"),
+        // Order
+        @JsonSubTypes.Type(value = OrderNotification.OrderCompleted.class, name = "ORDER_COMPLETED"),
+        @JsonSubTypes.Type(value = OrderNotification.OrderCancelled.class, name = "ORDER_CANCELLED"),
+        @JsonSubTypes.Type(value = OrderNotification.OrderShipped.class, name = "ORDER_SHIPPED"),
+        @JsonSubTypes.Type(value = OrderNotification.OrderDelivered.class, name = "ORDER_DELIVERED")
+})
 public interface TemplateNotification {
 
     /**

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.homesweet.notification.auth.entity.OAuth2UserPrincipal;
+import com.homesweet.notification.domain.event.TemplateNotificationEvent;
 import com.homesweet.notification.domain.notification.OrderNotification;
 import com.homesweet.notification.dto.PushNotificationDTO;
 import com.homesweet.notification.service.NotificationSendService;
@@ -31,8 +32,9 @@ import lombok.extern.slf4j.Slf4j;
 public class NotificationController {
 
     private final NotificationAPIService notificationAPIService;
+    private final org.springframework.kafka.core.KafkaTemplate<String, TemplateNotificationEvent> kafkaTemplate;
 
-    private final NotificationSendService notificationSendService;
+    // private final NotificationSendService notificationSendService;
 
     /**
      * SSE 알림 테스트
@@ -45,7 +47,7 @@ public class NotificationController {
                 .orderId(12345L)
                 .build();
         Long userId = ThreadLocalRandom.current().nextLong(1, range);
-        notificationSendService.sendTemplateNotificationToSingleUser(userId, notification);
+        kafkaTemplate.send("notification", new TemplateNotificationEvent(userId, notification));
     }
 
     @GetMapping("/test/multiple/{range}")
@@ -56,7 +58,7 @@ public class NotificationController {
                 .build();
         List<Long> userIds = IntStream.rangeClosed(1, range.intValue()).mapToObj(i -> (long) i)
                 .collect(Collectors.toList());
-        notificationSendService.sendTemplateNotificationToMultipleUsers(userIds, notification);
+        kafkaTemplate.send("notification", new TemplateNotificationEvent(userIds, notification));
     }
 
     /**

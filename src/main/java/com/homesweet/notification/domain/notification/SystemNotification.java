@@ -4,7 +4,7 @@ import com.homesweet.notification.domain.NotificationTemplateType;
 
 import lombok.Builder;
 import lombok.Getter;
-
+import lombok.extern.jackson.Jacksonized;
 
 /**
  * 시스템 관련 알림 클래스
@@ -14,7 +14,7 @@ import lombok.Getter;
  * @author dogyungkim
  */
 public class SystemNotification {
-    
+
     /**
      * 시스템 점검 알림
      * 
@@ -24,9 +24,10 @@ public class SystemNotification {
     @Getter
     public static class SystemMaintenance implements TemplateNotification {
         private final String maintenanceTime;
-        
+
         private final NotificationTemplateType eventType = NotificationTemplateType.SYSTEM_MAINTENANCE;
-        
+
+        @Jacksonized
         @Builder
         public SystemMaintenance(String maintenanceTime) {
             if (maintenanceTime == null || maintenanceTime.isBlank()) {
@@ -34,13 +35,13 @@ public class SystemNotification {
             }
             this.maintenanceTime = maintenanceTime;
         }
-        
+
         @Override
         public NotificationTemplateType getEventType() {
             return eventType;
         }
     }
-    
+
     /**
      * 시스템 업데이트 알림
      * 
@@ -52,9 +53,10 @@ public class SystemNotification {
     public static class SystemUpdate implements TemplateNotification {
         private final String version;
         private final String updateFeatures;
-        
+
         private final NotificationTemplateType eventType = NotificationTemplateType.SYSTEM_UPDATE;
-        
+
+        @Jacksonized
         @Builder
         public SystemUpdate(String version, String updateFeatures) {
             if (version == null || version.isBlank()) {
@@ -66,13 +68,13 @@ public class SystemNotification {
             this.version = version;
             this.updateFeatures = updateFeatures;
         }
-        
+
         @Override
         public NotificationTemplateType getEventType() {
             return eventType;
         }
     }
-    
+
     /**
      * 판매자 등록 완료 알림
      * 
@@ -82,17 +84,19 @@ public class SystemNotification {
     @Getter
     public static class SellerRegistrationComplete implements TemplateNotification {
         private final String userName;
-        
+
         private final NotificationTemplateType eventType = NotificationTemplateType.SELLER_REGISTRATION_COMPLETE;
-        
+
+        @Jacksonized
         @Builder
         public SellerRegistrationComplete(String userName) {
             if (userName == null || userName.isBlank()) {
-                throw new IllegalArgumentException("userName is required for SELLER_REGISTRATION_COMPLETE notification");
+                throw new IllegalArgumentException(
+                        "userName is required for SELLER_REGISTRATION_COMPLETE notification");
             }
             this.userName = userName;
         }
-        
+
         @Override
         public NotificationTemplateType getEventType() {
             return eventType;
