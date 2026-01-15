@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,8 +20,8 @@ import com.homesweet.notification.auth.entity.OAuth2UserPrincipal;
 import com.homesweet.notification.domain.event.TemplateNotificationEvent;
 import com.homesweet.notification.domain.notification.OrderNotification;
 import com.homesweet.notification.dto.PushNotificationDTO;
-import com.homesweet.notification.service.NotificationSendService;
 import com.homesweet.notification.service.impl.NotificationAPIService;
+import com.homesweet.notification.service.impl.NotificationProcessor;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,9 +33,8 @@ import lombok.extern.slf4j.Slf4j;
 public class NotificationController {
 
     private final NotificationAPIService notificationAPIService;
-    private final org.springframework.kafka.core.KafkaTemplate<String, TemplateNotificationEvent> kafkaTemplate;
-
-    // private final NotificationSendService notificationSendService;
+    private final KafkaTemplate<String, TemplateNotificationEvent> kafkaTemplate;
+    private final NotificationProcessor notificationProcessor;
 
     /**
      * SSE 알림 테스트
@@ -47,7 +47,8 @@ public class NotificationController {
                 .orderId(12345L)
                 .build();
         Long userId = ThreadLocalRandom.current().nextLong(1, range);
-        kafkaTemplate.send("notification", new TemplateNotificationEvent(userId, notification));
+        // kafkaTemplate.send("notification", new TemplateNotificationEvent(userId, notification));
+        notificationProcessor.processTemplateNotification(new TemplateNotificationEvent(userId, notification));
     }
 
     @GetMapping("/test/multiple/{range}")
@@ -58,7 +59,8 @@ public class NotificationController {
                 .build();
         List<Long> userIds = IntStream.rangeClosed(1, range.intValue()).mapToObj(i -> (long) i)
                 .collect(Collectors.toList());
-        kafkaTemplate.send("notification", new TemplateNotificationEvent(userIds, notification));
+        //kafkaTemplate.send("notification", new TemplateNotificationEvent(userIds, notification));
+        notificationProcessor.processTemplateNotification(new TemplateNotificationEvent(userIds, notification));
     }
 
     /**

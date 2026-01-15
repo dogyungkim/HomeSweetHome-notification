@@ -20,14 +20,12 @@ public class NotificationPublisher {
     private final RedisTemplate<String, Object> redisTemplate;
     private static final String TOPIC = "notification:push";
 
-    @Async("sseTaskExecutor")
     public void publish(Long userId, PushNotificationDTO notification) {
         NotificationMessage message = new NotificationMessage(userId, notification);
         redisTemplate.convertAndSend(TOPIC, message);
         log.debug("Notification published to Redis: userId={}", userId);
     }
-
-    @Async("sseTaskExecutor")
+    
     public void publishBulk(Map<Long, PushNotificationDTO> notifications) {
         if (notifications == null || notifications.isEmpty()) {
             return;

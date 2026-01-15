@@ -29,20 +29,8 @@ public class NotificationKafkaConsumer {
 
   @KafkaListener(topics = "notification", groupId = "notification-group", batch = "true")
   public void listenBulk(List<TemplateNotificationEvent> messages) {
-
-    try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-
-      messages.forEach(msg -> {
-        executor.submit(() -> {
-          try {
-            log.info("Processing message: {}", msg);
-            notificationProcessor.processTemplateNotification(msg);
-          } catch (Exception e) {
-            log.error("Error processing message: {}", msg, e);
-          }
-        });
-      });
-
-    }
+    messages.forEach(msg -> {
+      notificationProcessor.processTemplateNotification(msg);
+    });
   }
 }

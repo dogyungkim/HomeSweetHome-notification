@@ -48,12 +48,8 @@ public class NotificationProcessor {
    * 
    * 단일 사용자 또는 다수 사용자 모두 처리합니다.
    * TemplateNotification을 통해 DB에서 템플릿을 조회하고, Payload와 함께 알림을 전송합니다.
-   * 
-   * Kafka에서 호출될 때는 동기적으로 처리되어 commit 보장을 위해 @Async가 없습니다.
-   * 다른 곳에서 이벤트로 호출될 때는 비동기 처리를 위해 @EventListener와 함께 사용됩니다.
    */
   @EventListener
-  @Async("notificationTaskExecutor")
   public void handleTemplateNotificationEvent(TemplateNotificationEvent event) {
     processTemplateNotification(event);
   }
@@ -128,13 +124,17 @@ public class NotificationProcessor {
 
     // 다수 사용자 배치 처리
     processBatchNotifications(userIds, notification, template);
+    for (Long userId : userIds) {
+      processSingleNotification(List.of(userId), notification, template);
+    }
+    return;
   }
 
   // 내부 메서드
 
   private void processSingleNotification(List<Long> userIds, TemplateNotification notification,
       NotificationTemplate template) {
-    // 3. 템플릿을 사용하여 사용자화 된 알림 생성
+    // 1. 템플릿을 사용하여 사용자화 된 알림 생성
     UserNotification userNotification = createSingleUserNotification(userIds.get(0), notification, template);
 
     // 4. 단건 저장
@@ -142,11 +142,33 @@ public class NotificationProcessor {
       userNotificationService.saveUserNotification(userNotification);
 
       // 5. DTO 변환
-      // convertToPushNotificationDTO expects a list, so we wrap the single item
-      List<UserNotification> userNotifications = List.of(userNotification);
-      Map<Long, PushNotificationDTO> pushNotificationDTOMap = convertToPushNotificationDTO(template, userNotifications);
+      PushNotificationDTO pushNotificationDTO = buildPushNotificationDTO(userNotification.getContextData(), template, userNotification.getId());
       // 6. 푸시 알림 전송
-      notificationPublisher.publishBulk(pushNotificationDTOMap);
+      notificationPublisher.publish(userNotification.getUser().getId(), pushNotificationDTO);
+    }
+  }
+
+
+  /**
+   * 알림 정보를 활용해 사용자 알림 생성
+   */
+  /**
+   * 알림 정보를 활용해 단일 사용자 알림 생성
+   */
+  private UserNotification createSingleUserNotification(
+      Long userId,
+      TemplateNotification notification,
+      NotificationTemplate template) {
+    try {
+      User user = userService.getUserById(userId);
+      Map<String, Object> notificationContextData = notification.toMap();
+      return userNotificationService.createUserNotification(
+          user,
+          template,
+          notificationContextData);
+    } catch (Exception e) {
+      log.error("사용자 알림 객체 생성 실패: userId={}, error={}", userId, e.getMessage(), e);
+      return null;
     }
   }
 
@@ -181,28 +203,6 @@ public class NotificationProcessor {
     }
   }
 
-  /**
-   * 알림 정보를 활용해 사용자 알림 생성
-   */
-  /**
-   * 알림 정보를 활용해 단일 사용자 알림 생성
-   */
-  private UserNotification createSingleUserNotification(
-      Long userId,
-      TemplateNotification notification,
-      NotificationTemplate template) {
-    try {
-      User user = userService.getUserById(userId);
-      Map<String, Object> notificationContextData = notification.toMap();
-      return userNotificationService.createUserNotification(
-          user,
-          template,
-          notificationContextData);
-    } catch (Exception e) {
-      log.error("사용자 알림 객체 생성 실패: userId={}, error={}", userId, e.getMessage(), e);
-      return null;
-    }
-  }
 
   /**
    * 알림 정보를 활용해 다수 사용자 알림 생성 (배치)
@@ -232,7 +232,7 @@ public class NotificationProcessor {
   }
 
   /**
-   * 알림 객체를 푸시 알림 DTO로 변환
+   * 알림 객체를 여러개의 푸시 알림 DTO로 변환
    */
   private Map<Long, PushNotificationDTO> convertToPushNotificationDTO(
       NotificationTemplate template,
@@ -255,6 +255,9 @@ public class NotificationProcessor {
     return pushNotificationDTOMap;
   }
 
+  /**
+   * 알림 정보를 활용해 푸시 알림 DTO 생성
+   */
   private PushNotificationDTO buildPushNotificationDTO(
       Map<String, Object> contextData,
       NotificationTemplate template,

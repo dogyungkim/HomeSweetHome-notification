@@ -17,6 +17,8 @@ spring:
       validation-timeout: ${DATABASE_VALIDATION_TIMEOUT:5000}
       validation-interval: ${DATABASE_VALIDATION_INTERVAL:30000}
       validation-query: SELECT 1
+  flyway:
+    baseline-on-migrate: true
   jpa:
     open-in-view: false
     hibernate:
@@ -46,13 +48,16 @@ spring:
       properties:
         spring.json.value.default.type: com.homesweet.notification.domain.event.TemplateNotificationEvent
         spring.json.trusted.packages: "*"
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      # 성능 측정 후 작성
+      # fetch-min-size: # 최소 가져올 메시지 수
+      # fetch-max-wait: # 최대 대기 시간
+    # producer:
+    #   key-serializer: org.apache.kafka.common.serialization.StringSerializer
+    #   value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     listener:
-      ack-mode: BATCH  # 배치를 다 처리하면 커밋 (성능과 안정성의 균형)
+      # ack-mode: RECORD  # Record별 커밋 (중복 처리 방지)
+      ack-mode: BATCH
       concurrency: 3   # 컨슈머 스레드 3개 가동 (알림 발송은 I/O 작업이므로 병렬 처리가 중요)
-      type: SINGLE     # 메시지 하나씩 로직 수행 (로직 작성이 편함)
 logging:
   level:
     com.homesweet.notification: ERROR
@@ -80,3 +85,6 @@ management:
 
 notification:
   batchSize: ${NOTIFICATION_BATCH_SIZE:250}
+
+server:
+  port: 8081
