@@ -55,8 +55,8 @@ spring:
     #   key-serializer: org.apache.kafka.common.serialization.StringSerializer
     #   value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     listener:
-      # ack-mode: RECORD  # Record별 커밋 (중복 처리 방지)
-      ack-mode: BATCH
+      # ack-mode: RECORD  # Record별 커밋 (중복 처리를 방지할 수 있으나, 순서 변경 가능성 있음)
+      ack-mode: BATCH # 순서 변경이 이
       concurrency: 3   # 컨슈머 스레드 3개 가동 (알림 발송은 I/O 작업이므로 병렬 처리가 중요)
 logging:
   level:

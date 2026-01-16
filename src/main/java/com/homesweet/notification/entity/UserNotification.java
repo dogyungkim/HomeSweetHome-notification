@@ -42,7 +42,7 @@ public class UserNotification {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "notification_template_id")
+    @JoinColumn(name = "notification_template_id", nullable = true)
     private NotificationTemplate template;
 
     @JdbcTypeCode(SqlTypes.JSON)

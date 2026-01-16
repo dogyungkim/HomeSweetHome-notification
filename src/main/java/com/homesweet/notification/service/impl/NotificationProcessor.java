@@ -99,35 +99,31 @@ public class NotificationProcessor {
    * 커스텀 알림 처리 로직 (동기 처리용)
    * 
    * Kafka Listener에서 직접 호출하여 동기적으로 처리합니다.
+   * Custom 알림은 템플릿을 저장하지 않고 contextData에 직접 저장합니다.
    */
   public void processCustomNotification(CustomNotificationEvent event) {
-    log.info("커스텀 알림 이벤트 처리 시작: userIds={}, categoryType={}, title={}", event.userIds(),
-        event.notification().getTitle(), event.notification().getContent());
+    log.info("커스텀 알림 이벤트 처리 시작: userIds={}, title={}", event.userIds(),
+        event.notification().getTitle());
 
     // 1. 이벤트에서 알림 정보 추출
     CustomNotification notification = event.notification();
 
-    // TODO: 커스텀 알림은 따로 템플릿 저장하지 않기
-    // 2. 커스텀 알림 템플릿 생성
-    NotificationTemplate template = userNotificationService.createAndSaveCustomNotificationTemplate(
-        notification.getTitle(),
-        notification.getContent(),
-        notification.getRedirectUrl());
+    // 2. Custom 알림의 title, content, redirectUrl을 contextData에 추가
+    Map<String, Object> enrichedContextData = new HashMap<>(notification.toMap());
+    enrichedContextData.put("title", notification.getTitle());
+    enrichedContextData.put("content", notification.getContent());
+    enrichedContextData.put("redirectUrl", notification.getRedirectUrl());
 
     List<Long> userIds = event.userIds();
 
     // 단일 사용자 처리 최적화
     if (userIds.size() == 1) {
-      processSingleNotification(userIds, notification, template);
+      processSingleCustomNotification(userIds.get(0), enrichedContextData);
       return;
     }
 
     // 다수 사용자 배치 처리
-    processBatchNotifications(userIds, notification, template);
-    for (Long userId : userIds) {
-      processSingleNotification(List.of(userId), notification, template);
-    }
-    return;
+    processBatchCustomNotifications(userIds, enrichedContextData);
   }
 
   // 내부 메서드
@@ -140,7 +136,6 @@ public class NotificationProcessor {
     // 4. 단건 저장
     if (userNotification != null) {
       userNotificationService.saveUserNotification(userNotification);
-
       // 5. DTO 변환
       PushNotificationDTO pushNotificationDTO = buildPushNotificationDTO(userNotification.getContextData(), template, userNotification.getId());
       // 6. 푸시 알림 전송
@@ -148,10 +143,35 @@ public class NotificationProcessor {
     }
   }
 
-
   /**
-   * 알림 정보를 활용해 사용자 알림 생성
+   * 커스텀 알림 단일 사용자 처리
    */
+  private void processSingleCustomNotification(Long userId, Map<String, Object> contextData) {
+    try {
+      User user = userService.getUserById(userId);
+      // 템플릿 없이 UserNotification 생성
+      UserNotification userNotification = userNotificationService.createUserNotification(
+          user,
+          null, // Custom 알림은 템플릿 없음
+          contextData);
+
+      // 단건 저장
+      userNotificationService.saveUserNotification(userNotification);
+
+      // DTO 변환 (템플릿 null 처리)
+      PushNotificationDTO pushNotificationDTO = buildPushNotificationDTO(
+          userNotification.getContextData(),
+          null,
+          userNotification.getId());
+
+      // 푸시 알림 전송
+      notificationPublisher.publish(userId, pushNotificationDTO);
+    } catch (Exception e) {
+      log.error("커스텀 알림 처리 실패: userId={}, error={}", userId, e.getMessage(), e);
+    }
+  }
+
+
   /**
    * 알림 정보를 활용해 단일 사용자 알림 생성
    */
@@ -203,6 +223,38 @@ public class NotificationProcessor {
     }
   }
 
+  /**
+   * 커스텀 알림 다수 사용자 배치 처리
+   */
+  private void processBatchCustomNotifications(List<Long> userIds, Map<String, Object> contextData) {
+    int totalUsers = userIds.size();
+    for (int i = 0; i < totalUsers; i += BATCH_SIZE) {
+      int end = Math.min(i + BATCH_SIZE, totalUsers);
+      List<Long> batchUserIds = userIds.subList(i, end);
+
+      try {
+        // 배치 단위 알림 생성 (템플릿 없음)
+        List<UserNotification> batchUserNotifications = createBatchCustomUserNotifications(batchUserIds, contextData);
+
+        if (batchUserNotifications.isEmpty()) {
+          continue;
+        }
+
+        // 배치 저장
+        userNotificationService.bulkInsertUserNotifications(batchUserNotifications);
+
+        // 배치 DTO 변환 및 전송 (템플릿 null 처리)
+        Map<Long, PushNotificationDTO> pushNotificationDTOMap = convertToPushNotificationDTO(null,
+            batchUserNotifications);
+        notificationPublisher.publishBulk(pushNotificationDTOMap);
+
+      } catch (Exception e) {
+        log.error("커스텀 알림 배치 처리 중 오류 발생: range={}-{}, error={}", i, end, e.getMessage(), e);
+        // 배치 처리 중 오류가 발생하더라도 다음 배치는 계속 처리해야 함
+      }
+    }
+  }
+
 
   /**
    * 알림 정보를 활용해 다수 사용자 알림 생성 (배치)
@@ -226,6 +278,30 @@ public class NotificationProcessor {
         userNotifications.add(userNotification);
       } catch (Exception e) {
         log.error("사용자 알림 객체 생성 실패: userId={}, error={}", user.getId(), e.getMessage(), e);
+      }
+    }
+    return userNotifications;
+  }
+
+  /**
+   * 커스텀 알림 정보를 활용해 다수 사용자 알림 생성 (배치, 템플릿 없음)
+   */
+  private List<UserNotification> createBatchCustomUserNotifications(
+      List<Long> userIds,
+      Map<String, Object> contextData) {
+    List<UserNotification> userNotifications = new ArrayList<>();
+    List<User> users = userService.getManyUsersById(userIds);
+
+    for (User user : users) {
+      try {
+        // 템플릿 없이 사용자 알림 생성
+        UserNotification userNotification = userNotificationService.createUserNotification(
+            user,
+            null, // Custom 알림은 템플릿 없음
+            contextData);
+        userNotifications.add(userNotification);
+      } catch (Exception e) {
+        log.error("커스텀 알림 객체 생성 실패: userId={}, error={}", user.getId(), e.getMessage(), e);
       }
     }
     return userNotifications;
@@ -257,11 +333,34 @@ public class NotificationProcessor {
 
   /**
    * 알림 정보를 활용해 푸시 알림 DTO 생성
+   * 
+   * @param contextData 컨텍스트 데이터
+   * @param template 알림 템플릿 (Custom 알림의 경우 null)
+   * @param notificationId 알림 ID
    */
   private PushNotificationDTO buildPushNotificationDTO(
       Map<String, Object> contextData,
       NotificationTemplate template,
       Long notificationId) {
+    // Custom 알림인 경우 (template이 null)
+    if (template == null) {
+      String title = (String) contextData.getOrDefault("title", "");
+      String content = (String) contextData.getOrDefault("content", "");
+      String redirectUrl = (String) contextData.getOrDefault("redirectUrl", "");
+
+      return PushNotificationDTO.builder()
+          .notificationId(notificationId)
+          .title(title)
+          .content(content)
+          .redirectUrl(redirectUrl)
+          .contextData(contextData)
+          .categoryType(NotificationCategoryType.CUSTOM)
+          .isRead(false)
+          .createdAt(LocalDateTime.now())
+          .build();
+    }
+
+    // 템플릿 기반 알림인 경우
     return PushNotificationDTO.builder()
         .notificationId(notificationId)
         .title(template.getTitle())
