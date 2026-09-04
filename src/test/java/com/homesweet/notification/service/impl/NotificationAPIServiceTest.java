@@ -8,6 +8,8 @@ import com.homesweet.notification.entity.NotificationTemplate;
 import com.homesweet.notification.entity.UserNotification;
 import com.homesweet.notification.exception.ErrorCode;
 import com.homesweet.notification.exception.NotificationException;
+import com.homesweet.notification.domain.broadcast.repository.BroadcastNotificationRepository;
+import com.homesweet.notification.domain.broadcast.repository.UserBroadcastStateRepository;
 import com.homesweet.notification.repository.UserNotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +35,12 @@ class NotificationAPIServiceTest {
 
     @Mock
     private UserNotificationRepository userNotificationRepository;
+
+    @Mock
+    private BroadcastNotificationRepository broadcastNotificationRepository;
+
+    @Mock
+    private UserBroadcastStateRepository userBroadcastStateRepository;
 
     @InjectMocks
     private NotificationAPIService notificationAPIService;

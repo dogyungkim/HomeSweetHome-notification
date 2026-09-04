@@ -26,6 +26,12 @@ import com.homesweet.notification.service.impl.NotificationProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import com.homesweet.notification.auth.entity.User;
+import com.homesweet.notification.domain.broadcast.service.BroadcastNotificationService;
+import com.homesweet.notification.dto.NotificationFeedResponse;
+
+import java.time.LocalDateTime;
+
 @RestController
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
@@ -33,13 +39,13 @@ import lombok.extern.slf4j.Slf4j;
 public class NotificationController {
 
     private final NotificationAPIService notificationAPIService;
+    private final BroadcastNotificationService broadcastNotificationService;
     private final KafkaTemplate<String, TemplateNotificationEvent> kafkaTemplate;
     private final NotificationProcessor notificationProcessor;
 
     /**
      * SSE 알림 테스트
-     * 
-     **/
+     */
     @GetMapping("/test/{range}")
     public void testMessage(@PathVariable Long range) {
         var notification = OrderNotification.OrderCompleted.builder()
@@ -47,62 +53,108 @@ public class NotificationController {
                 .orderId(12345L)
                 .build();
         Long userId = ThreadLocalRandom.current().nextLong(1, range);
-        // kafkaTemplate.send("notification", new TemplateNotificationEvent(userId, notification));
         notificationProcessor.processTemplateNotification(new TemplateNotificationEvent(userId, notification));
     }
 
     @GetMapping("/test/multiple/{range}")
     public void testMultipleMessage(@PathVariable Long range) {
+        long effectiveRange = Math.min(range, 1000L);
         var notification = OrderNotification.OrderCompleted.builder()
                 .userName("test")
                 .orderId(12345L)
                 .build();
-        List<Long> userIds = IntStream.rangeClosed(1, range.intValue()).mapToObj(i -> (long) i)
+        List<Long> userIds = IntStream.rangeClosed(1, (int) effectiveRange).mapToObj(i -> (long) i)
                 .collect(Collectors.toList());
-        //kafkaTemplate.send("notification", new TemplateNotificationEvent(userIds, notification));
         notificationProcessor.processTemplateNotification(new TemplateNotificationEvent(userIds, notification));
     }
 
     /**
-     * 사용자의 알림 목록 조회 (최대 20개)
+     * 통합 알림함 목록 조회 (개인 알림 + 대상 단체 알림 최신 20건 병합, Section 7)
      */
     @GetMapping
-    public ResponseEntity<List<PushNotificationDTO>> getNotifications(
-            @AuthenticationPrincipal OAuth2UserPrincipal principal) {
-        log.info("알림 목록 조회: userId={}", principal.getUserId());
-        List<PushNotificationDTO> notifications = notificationAPIService.getAllNotifications(principal.getUserId());
-        return ResponseEntity.ok(notifications);
+    public ResponseEntity<NotificationFeedResponse> getNotifications(
+            @AuthenticationPrincipal Object principal) {
+        Long userId = extractUserId(principal);
+        LocalDateTime userCreatedAt = extractUserCreatedAt(principal);
+
+        log.info("통합 알림 목록 조회: userId={}", userId);
+        NotificationFeedResponse response = notificationAPIService.getIntegratedFeed(userId, userCreatedAt);
+        return ResponseEntity.ok(response);
     }
 
     /**
-     * 알림 읽음 처리 (단일 및 여러 개 모두 처리)
-     * 
-     * RequestBody 예시:
-     * - 단일: [1]
-     * - 여러 개: [1, 2, 3]
+     * 개인 알림 읽음 처리 (기존 경로 유지, Section 8)
      */
     @PatchMapping("/read")
     public ResponseEntity<Void> markAsRead(
-            @AuthenticationPrincipal OAuth2UserPrincipal principal,
+            @AuthenticationPrincipal Object principal,
             @RequestBody List<Long> notificationIds) {
-        log.info("알림 읽음 처리: userId={}, notificationIds={}", principal.getUserId(), notificationIds);
-        notificationAPIService.markAsRead(principal.getUserId(), notificationIds);
+        Long userId = extractUserId(principal);
+        log.info("개인 알림 읽음 처리: userId={}, notificationIds={}", userId, notificationIds);
+        notificationAPIService.markAsRead(userId, notificationIds);
         return ResponseEntity.ok().build();
     }
 
     /**
-     * 알림 삭제 처리 (단일 및 여러 개 모두 처리)
-     * 
-     * RequestBody 예시:
-     * - 단일: [1]
-     * - 여러 개: [1, 2, 3]
+     * 개인 알림 삭제 처리 (기존 경로 유지, Section 8)
      */
     @DeleteMapping
     public ResponseEntity<Void> deleteNotifications(
-            @AuthenticationPrincipal OAuth2UserPrincipal principal,
+            @AuthenticationPrincipal Object principal,
             @RequestBody List<Long> notificationIds) {
-        log.info("알림 삭제 처리: userId={}, notificationIds={}", principal.getUserId(), notificationIds);
-        notificationAPIService.markAsDeleted(principal.getUserId(), notificationIds);
+        Long userId = extractUserId(principal);
+        log.info("개인 알림 삭제 처리: userId={}, notificationIds={}", userId, notificationIds);
+        notificationAPIService.markAsDeleted(userId, notificationIds);
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 단체 알림 읽음 처리 (Section 8)
+     * PATCH /api/v1/notifications/broadcast/{broadcastNotificationId}/read
+     */
+    @PatchMapping("/broadcast/{broadcastNotificationId}/read")
+    public ResponseEntity<Void> markBroadcastAsRead(
+            @AuthenticationPrincipal Object principal,
+            @PathVariable Long broadcastNotificationId) {
+        Long userId = extractUserId(principal);
+        LocalDateTime userCreatedAt = extractUserCreatedAt(principal);
+
+        log.info("단체 알림 읽음 처리: userId={}, broadcastNotificationId={}", userId, broadcastNotificationId);
+        broadcastNotificationService.markBroadcastAsRead(userId, userCreatedAt, broadcastNotificationId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 단체 알림 삭제 처리 (Section 8)
+     * DELETE /api/v1/notifications/broadcast/{broadcastNotificationId}
+     */
+    @DeleteMapping("/broadcast/{broadcastNotificationId}")
+    public ResponseEntity<Void> deleteBroadcastNotification(
+            @AuthenticationPrincipal Object principal,
+            @PathVariable Long broadcastNotificationId) {
+        Long userId = extractUserId(principal);
+        LocalDateTime userCreatedAt = extractUserCreatedAt(principal);
+
+        log.info("단체 알림 삭제 처리: userId={}, broadcastNotificationId={}", userId, broadcastNotificationId);
+        broadcastNotificationService.markBroadcastAsDeleted(userId, userCreatedAt, broadcastNotificationId);
+        return ResponseEntity.ok().build();
+    }
+
+    private Long extractUserId(Object principal) {
+        if (principal instanceof OAuth2UserPrincipal p) {
+            return p.getUserId();
+        } else if (principal instanceof User u) {
+            return u.getId();
+        }
+        return 0L;
+    }
+
+    private LocalDateTime extractUserCreatedAt(Object principal) {
+        if (principal instanceof OAuth2UserPrincipal p) {
+            return p.getCreatedAt();
+        } else if (principal instanceof User u) {
+            return u.getCreatedAt();
+        }
+        return null;
     }
 }

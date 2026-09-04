@@ -28,7 +28,8 @@ public interface UserNotificationRepository extends JpaRepository<UserNotificati
         * template과 category를 함께 조회하여 N+1 문제 방지
         */
        @Query("SELECT DISTINCT un FROM UserNotification un " +
-                     "LEFT JOIN FETCH un.template " +
+                     "LEFT JOIN FETCH un.template t " +
+                     "LEFT JOIN FETCH t.category " +
                      "WHERE un.user.id = :userId AND un.isDeleted = false " +
                      "ORDER BY un.createdAt DESC LIMIT 20")
        List<UserNotification> findTop20ByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(@Param("userId") Long userId);

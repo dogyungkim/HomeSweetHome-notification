@@ -2,6 +2,7 @@ package com.homesweet.notification.auth.entity;
 
 import lombok.Getter;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +68,13 @@ public class OAuth2UserPrincipal implements OAuth2User {
      */
     public String getProvider() {
         return user.getProvider().getProviderName();
+    }
+
+    /**
+     * 사용자 가입 시각 반환
+     */
+    public LocalDateTime getCreatedAt() {
+        return user.getCreatedAt();
     }
 }
 

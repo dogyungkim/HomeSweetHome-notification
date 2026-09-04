@@ -6,7 +6,8 @@ package com.homesweet.notification.auth.entity;
  */
 public enum UserRole {
     USER("ROLE_USER"),
-    SELLER("ROLE_SELLER");
+    SELLER("ROLE_SELLER"),
+    ADMIN("ROLE_ADMIN");
 
     private final String authority;
 

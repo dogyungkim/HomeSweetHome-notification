@@ -14,9 +14,14 @@ import com.homesweet.notification.exception.NotificationException;
 public record CustomNotificationEvent(
         List<Long> userIds,
         CustomNotification notification) {
+    public static final int MAX_LEGACY_USER_IDS = 1000;
+
     public CustomNotificationEvent {
         if (userIds == null || userIds.isEmpty()) {
             throw new NotificationException(ErrorCode.DATA_MISSING);
+        }
+        if (userIds.size() > MAX_LEGACY_USER_IDS) {
+            throw new NotificationException(ErrorCode.LEGACY_BULK_LIMIT_EXCEEDED);
         }
         if (notification == null) {
             throw new NotificationException(ErrorCode.DATA_MISSING);

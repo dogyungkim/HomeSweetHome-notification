@@ -17,9 +17,14 @@ import java.util.List;
 public record TemplateNotificationEvent(
         List<Long> userIds,
         TemplateNotification notification) {
+    public static final int MAX_LEGACY_USER_IDS = 1000;
+
     public TemplateNotificationEvent {
         if (userIds == null || userIds.isEmpty()) {
             throw new NotificationException(ErrorCode.DATA_MISSING);
+        }
+        if (userIds.size() > MAX_LEGACY_USER_IDS) {
+            throw new NotificationException(ErrorCode.LEGACY_BULK_LIMIT_EXCEEDED);
         }
         if (notification == null) {
             throw new NotificationException(ErrorCode.DATA_MISSING);

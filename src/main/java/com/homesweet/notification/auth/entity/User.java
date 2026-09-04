@@ -7,8 +7,12 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Setter;
 
+import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @AllArgsConstructor
@@ -57,6 +61,11 @@ public class User {
 
 	@Column(name = "birth_date")
 	private LocalDate birthDate;
+
+	@CreationTimestamp
+	@ColumnDefault("CURRENT_TIMESTAMP(6)")
+	@Column(name = "created_at", insertable = false, updatable = false)
+	private LocalDateTime createdAt;
 
 	/**
 	 * OAuth 사용자인지 확인합니다.

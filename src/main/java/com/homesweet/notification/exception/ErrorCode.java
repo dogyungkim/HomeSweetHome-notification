@@ -108,7 +108,10 @@ public enum ErrorCode {
 
     // Common
     INVALID_DATA(HttpStatus.BAD_REQUEST, "유효하지 않은 데이터입니다."),
-    DATA_MISSING(HttpStatus.BAD_REQUEST, "데이터가 누락되었습니다.");
+    DATA_MISSING(HttpStatus.BAD_REQUEST, "데이터가 누락되었습니다."),
+    INVALID_AUDIENCE_RANGE(HttpStatus.BAD_REQUEST, "유효하지 않은 대상 사용자 ID 범위입니다."),
+    BROADCAST_NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "단체 알림을 찾을 수 없습니다."),
+    LEGACY_BULK_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "소규모 임의 사용자 목록 알림 발송 허용 건수를 초과했습니다.");
 
     private final HttpStatus status;
     private final String message;
