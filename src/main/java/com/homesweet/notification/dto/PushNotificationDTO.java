@@ -4,6 +4,7 @@ import java.util.Map;
 import java.time.LocalDateTime;
 
 import com.homesweet.notification.domain.NotificationCategoryType;
+import com.homesweet.notification.domain.broadcast.domain.NotificationType;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -19,5 +20,6 @@ public class PushNotificationDTO {
     boolean isRead;
     NotificationCategoryType categoryType;
     LocalDateTime createdAt;
+    NotificationType notificationType;
 
 }

@@ -9,6 +9,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @AllArgsConstructor
@@ -57,6 +58,16 @@ public class User {
 
 	@Column(name = "birth_date")
 	private LocalDate birthDate;
+
+	@Column(name = "created_at", nullable = false, updatable = false)
+	private LocalDateTime createdAt;
+
+	@PrePersist
+	private void setCreatedAt() {
+		if (createdAt == null) {
+			createdAt = LocalDateTime.now();
+		}
+	}
 
 	/**
 	 * OAuth 사용자인지 확인합니다.

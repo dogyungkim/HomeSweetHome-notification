@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import com.homesweet.notification.domain.event.TemplateNotificationEvent;
+import com.homesweet.notification.domain.event.BroadcastNotificationEvent;
+import com.homesweet.notification.domain.broadcast.service.BroadcastNotificationService;
 import com.homesweet.notification.service.impl.NotificationProcessor;
 
 /**
@@ -26,11 +28,21 @@ import com.homesweet.notification.service.impl.NotificationProcessor;
 public class NotificationKafkaConsumer {
 
   private final NotificationProcessor notificationProcessor;
+  private final BroadcastNotificationService broadcastNotificationService;
 
   @KafkaListener(topics = "notification", groupId = "notification-group", batch = "true")
   public void listenBulk(List<TemplateNotificationEvent> messages) {
     messages.forEach(msg -> {
       notificationProcessor.processTemplateNotification(msg);
     });
+  }
+
+  @KafkaListener(
+      topics = "${notification.kafka.broadcast-topic:broadcast-notification}",
+      groupId = "broadcast-notification-group",
+      batch = "true",
+      properties = "spring.json.value.default.type:com.homesweet.notification.domain.event.BroadcastNotificationEvent")
+  public void listenBroadcast(List<BroadcastNotificationEvent> messages) {
+    messages.forEach(broadcastNotificationService::create);
   }
 }

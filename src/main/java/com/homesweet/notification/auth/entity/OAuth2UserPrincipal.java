@@ -5,6 +5,7 @@ import lombok.Getter;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -48,6 +49,10 @@ public class OAuth2UserPrincipal implements OAuth2User {
         return user.getId();
     }
 
+    public LocalDateTime getCreatedAt() {
+        return user.getCreatedAt();
+    }
+
     /**
      * 사용자 이메일 반환
      */
@@ -69,4 +74,3 @@ public class OAuth2UserPrincipal implements OAuth2User {
         return user.getProvider().getProviderName();
     }
 }
-

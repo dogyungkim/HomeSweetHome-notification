@@ -85,6 +85,8 @@ management:
 
 notification:
   batchSize: ${NOTIFICATION_BATCH_SIZE:250}
+  kafka:
+    broadcast-topic: ${KAFKA_BROADCAST_TOPIC:broadcast-notification}
 
 server:
   port: 8081

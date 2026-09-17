@@ -20,6 +20,9 @@ import com.homesweet.notification.auth.entity.OAuth2UserPrincipal;
 import com.homesweet.notification.domain.event.TemplateNotificationEvent;
 import com.homesweet.notification.domain.notification.OrderNotification;
 import com.homesweet.notification.dto.PushNotificationDTO;
+import com.homesweet.notification.domain.broadcast.service.BroadcastNotificationService;
+import com.homesweet.notification.exception.ErrorCode;
+import com.homesweet.notification.exception.NotificationException;
 import com.homesweet.notification.service.impl.NotificationAPIService;
 import com.homesweet.notification.service.impl.NotificationProcessor;
 
@@ -35,6 +38,7 @@ public class NotificationController {
     private final NotificationAPIService notificationAPIService;
     private final KafkaTemplate<String, TemplateNotificationEvent> kafkaTemplate;
     private final NotificationProcessor notificationProcessor;
+    private final BroadcastNotificationService broadcastNotificationService;
 
     /**
      * SSE 알림 테스트
@@ -68,9 +72,11 @@ public class NotificationController {
      */
     @GetMapping
     public ResponseEntity<List<PushNotificationDTO>> getNotifications(
-            @AuthenticationPrincipal OAuth2UserPrincipal principal) {
-        log.info("알림 목록 조회: userId={}", principal.getUserId());
-        List<PushNotificationDTO> notifications = notificationAPIService.getAllNotifications(principal.getUserId());
+            @AuthenticationPrincipal Object principal) {
+        OAuth2UserPrincipal authenticatedPrincipal = requirePrincipal(principal);
+        log.info("알림 목록 조회: userId={}", authenticatedPrincipal.getUserId());
+        List<PushNotificationDTO> notifications = notificationAPIService.getAllNotifications(
+                authenticatedPrincipal.getUserId(), authenticatedPrincipal.getCreatedAt());
         return ResponseEntity.ok(notifications);
     }
 
@@ -83,10 +89,11 @@ public class NotificationController {
      */
     @PatchMapping("/read")
     public ResponseEntity<Void> markAsRead(
-            @AuthenticationPrincipal OAuth2UserPrincipal principal,
+            @AuthenticationPrincipal Object principal,
             @RequestBody List<Long> notificationIds) {
-        log.info("알림 읽음 처리: userId={}, notificationIds={}", principal.getUserId(), notificationIds);
-        notificationAPIService.markAsRead(principal.getUserId(), notificationIds);
+        OAuth2UserPrincipal authenticatedPrincipal = requirePrincipal(principal);
+        log.info("알림 읽음 처리: userId={}, notificationIds={}", authenticatedPrincipal.getUserId(), notificationIds);
+        notificationAPIService.markAsRead(authenticatedPrincipal.getUserId(), notificationIds);
         return ResponseEntity.ok().build();
     }
 
@@ -99,10 +106,40 @@ public class NotificationController {
      */
     @DeleteMapping
     public ResponseEntity<Void> deleteNotifications(
-            @AuthenticationPrincipal OAuth2UserPrincipal principal,
+            @AuthenticationPrincipal Object principal,
             @RequestBody List<Long> notificationIds) {
-        log.info("알림 삭제 처리: userId={}, notificationIds={}", principal.getUserId(), notificationIds);
-        notificationAPIService.markAsDeleted(principal.getUserId(), notificationIds);
+        OAuth2UserPrincipal authenticatedPrincipal = requirePrincipal(principal);
+        log.info("알림 삭제 처리: userId={}, notificationIds={}", authenticatedPrincipal.getUserId(), notificationIds);
+        notificationAPIService.markAsDeleted(authenticatedPrincipal.getUserId(), notificationIds);
         return ResponseEntity.ok().build();
+    }
+
+    @PatchMapping("/broadcast/{broadcastNotificationId}/read")
+    public ResponseEntity<Void> markBroadcastAsRead(
+            @AuthenticationPrincipal Object principal,
+            @PathVariable Long broadcastNotificationId) {
+        OAuth2UserPrincipal authenticatedPrincipal = requirePrincipal(principal);
+        broadcastNotificationService.markAsRead(
+                authenticatedPrincipal.getUserId(), authenticatedPrincipal.getCreatedAt(), broadcastNotificationId);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/broadcast/{broadcastNotificationId}")
+    public ResponseEntity<Void> deleteBroadcastNotification(
+            @AuthenticationPrincipal Object principal,
+            @PathVariable Long broadcastNotificationId) {
+        OAuth2UserPrincipal authenticatedPrincipal = requirePrincipal(principal);
+        broadcastNotificationService.markAsDeleted(
+                authenticatedPrincipal.getUserId(), authenticatedPrincipal.getCreatedAt(), broadcastNotificationId);
+        return ResponseEntity.ok().build();
+    }
+
+    private OAuth2UserPrincipal requirePrincipal(Object principal) {
+        if (principal instanceof OAuth2UserPrincipal authenticatedPrincipal
+                && authenticatedPrincipal.getUserId() != null
+                && authenticatedPrincipal.getCreatedAt() != null) {
+            return authenticatedPrincipal;
+        }
+        throw new NotificationException(ErrorCode.TOKEN_MISSING);
     }
 }

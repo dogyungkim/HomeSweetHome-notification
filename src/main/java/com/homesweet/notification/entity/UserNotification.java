@@ -64,7 +64,8 @@ public class UserNotification {
             NotificationTemplate template,
             Map<String, Object> contextData,
             Boolean isRead,
-            Boolean isDeleted) {
+            Boolean isDeleted,
+            LocalDateTime createdAt) {
         // 필수 필드 검증
         if (user == null || user.getId() == null) {
             throw new NotificationException(ErrorCode.NOTIFICATION_USER_ID_IS_NULL);
@@ -78,6 +79,14 @@ public class UserNotification {
         this.contextData = contextData;
         this.isRead = isRead != null ? isRead : false;
         this.isDeleted = isDeleted != null ? isDeleted : false;
+        this.createdAt = createdAt;
+    }
+
+    @PrePersist
+    private void setCreatedAt() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 
     public void markAsRead() {
